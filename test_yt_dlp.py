@@ -1,4 +1,7 @@
 import yt_dlp
+from dotenv import load_dotenv
+
+load_dotenv(".env")
 
 
 class YoutubeDL:
