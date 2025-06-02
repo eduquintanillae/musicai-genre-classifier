@@ -76,7 +76,7 @@ def get_playlists():
     playlist_tracks = get_playlist_tracks(playlist_id)
     df = pd.DataFrame(playlist_tracks)
     df["playlist_id"] = playlist_id
-    df["playlist_name"] = playlists["items"][0]["name"]
+    df["playlist_name"] = playlist_name
     df.to_csv("playlist_tracks.csv", index=False)
     return playlist_tracks
 

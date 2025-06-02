@@ -2,3 +2,4 @@
 .env
 .cache
 /audios
+/__pycache__

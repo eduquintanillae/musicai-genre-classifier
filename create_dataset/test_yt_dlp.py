@@ -21,6 +21,11 @@ class YoutubeDL:
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download(urls)
+            output_paths = []
+            for url in urls:
+                info = ydl.extract_info(url, download=False)
+                output_paths.append(ydl.prepare_filename(info).replace(".webm", ".wav"))
+        return output_paths
 
     def search_youtube(self, query):
         ydl_opts = {}
@@ -42,4 +47,6 @@ for i, row in df.iterrows():
     print(url)
     urls.append(url)
 
-YoutubeDL().download(urls)
+output_paths = YoutubeDL().download(urls)
+df["output_path"] = output_paths
+df.to_csv("../playlist_tracks.csv", index=False)
