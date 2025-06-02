@@ -4,14 +4,16 @@ from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.cache_handler import FlaskSessionCacheHandler
 from flask import Flask, session, url_for, request, redirect
+import pandas as pd
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.urandom(64)
 
 load_dotenv(".env")
+app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY")
 CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
+PLAYLIST_NAME = os.getenv("PLAYLIST_NAME")
 SCOPE = "playlist-read-private"
 CACHE_HANDLER = FlaskSessionCacheHandler(session)
 
@@ -62,9 +64,24 @@ def callback():
 
 @app.route("/get_playlists")
 def get_playlists():
-    validate_token()
     playlists = sp.current_user_playlists()
-    playlist_id = playlists["items"][0]["id"]
+    playlist_id = None
+    playlist_name = PLAYLIST_NAME
+    for playlist in playlists["items"]:
+        if playlist["name"] == playlist_name:
+            playlist_id = playlist["id"]
+            break
+    if not playlist_id:
+        return "Playlist not found. Please provide a valid playlist name."
+    playlist_tracks = get_playlist_tracks(playlist_id)
+    df = pd.DataFrame(playlist_tracks)
+    df["playlist_id"] = playlist_id
+    df["playlist_name"] = playlist_name
+    df.to_csv("playlist_tracks.csv", index=False)
+    return playlist_tracks
+
+
+def get_playlist_tracks(playlist_id):
     playlist_tracks = sp.playlist_tracks(playlist_id)
     playlist_tracks = [get_track_info(item) for item in playlist_tracks["items"]]
     return playlist_tracks
