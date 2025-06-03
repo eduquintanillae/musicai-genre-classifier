@@ -34,6 +34,12 @@ def validate_token():
         return redirect(auth_url)
 
 
+def get_genre(artist_id):
+    artist = sp.artist(artist_id)
+    genres = artist["genres"]
+    return genres if genres else ["Unknown"]
+
+
 def get_track_info(track):
     return {
         "id": track["track"]["id"],
@@ -74,6 +80,8 @@ def get_playlists():
     if not playlist_id:
         return "Playlist not found. Please provide a valid playlist name."
     playlist_tracks = get_playlist_tracks(playlist_id)
+    for i, track in enumerate(playlist_tracks):
+        playlist_tracks[i]["genres"] = get_genre(track["artist_id"])
     df = pd.DataFrame(playlist_tracks)
     df["playlist_id"] = playlist_id
     df["playlist_name"] = playlist_name

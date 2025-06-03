@@ -3,3 +3,4 @@
 .cache
 /audios
 /__pycache__
+/datasets
