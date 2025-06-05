@@ -53,11 +53,11 @@ def validate_token():
 def get_genre(artist_id):
     artist = sp.artist(artist_id)
     genres = artist["genres"]
-    return genres if genres else ["Unknown"]
+    return genres if genres else ["unknown"]
 
 
 def get_track_info(track):
-    if track:
+    if track["track"]:
         track_info = {
             "id": track["track"]["id"],
             "name": track["track"]["name"],
@@ -90,8 +90,6 @@ def get_track_info(track):
 
 
 def encode_genres(df):
-    # df["genres"] = df.apply(lambda x: [] if "Unknown" in x.genres else x.genres, axis=1)
-    # df = df[df["genres"].apply(lambda x: len(x) > 0)]
     df["genres"] = df["genres"].apply(
         lambda x: ast.literal_eval if isinstance(x, str) else x
     )
@@ -120,6 +118,7 @@ def callback():
 def get_playlists():
     playlists = sp.current_user_playlists()
     playlist_id = None
+
     playlist_name = PLAYLIST_NAME
     for playlist in playlists["items"]:
         if playlist["name"] == playlist_name:
@@ -127,13 +126,20 @@ def get_playlists():
             break
     if not playlist_id:
         return "Playlist not found. Please provide a valid playlist name."
+
     playlist_tracks = get_playlist_tracks(playlist_id)
     for i, track in enumerate(playlist_tracks):
-        playlist_tracks[i]["genres"] = get_genre(track["artist_id"])
+        if track["artist_id"]:
+            playlist_tracks[i]["genres"] = get_genre(track["artist_id"])
+        else:
+            playlist_tracks[i]["genres"] = None
+
     df = pd.DataFrame(playlist_tracks)
+    df = df.dropna(subset=["id"])
     df["playlist_id"] = playlist_id
     df["playlist_name"] = playlist_name
     df = encode_genres(df)
+    print(f"Final number of tracks: {df.shape[0]}")
     df.to_csv("major_playlist_tracks.csv", index=False)
     return playlist_tracks
 
@@ -152,7 +158,7 @@ def get_playlist_tracks(playlist_id):
         playlist_tracks["items"].extend(next_tracks["items"])
         info = [get_track_info(item) for item in next_tracks["items"]]
         try:
-            playlist_tracks_info.append(info)
+            playlist_tracks_info.extend(info)
         except Exception as e:
             print(f"Error processing track info: {e}")
             continue
