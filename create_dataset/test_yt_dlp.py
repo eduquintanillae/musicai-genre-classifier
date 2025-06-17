@@ -1,11 +1,12 @@
 import yt_dlp
 from dotenv import load_dotenv
 import pandas as pd
-from concurrent.futures import ProcessPoolExecutor
 import time
-import os
+from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
 
 load_dotenv("../.env")
+FOLDER = "../datasets/audios/major_playlist"
 
 
 class YoutubeDL:
@@ -13,7 +14,7 @@ class YoutubeDL:
         self.ydl_opts = {
             "format": "bestaudio/best",
             "ffmpeg_location": "C:/Users/Edu/Downloads/ffmpeg-7.1.1-essentials_build/ffmpeg-7.1.1-essentials_build/bin",
-            "outtmpl": "C:../audios/%(title)s.%(ext)s",
+            "outtmpl": f"C:{FOLDER}/%(title)s.%(ext)s",
             "postprocessors": [
                 {
                     "key": "FFmpegExtractAudio",
@@ -36,37 +37,51 @@ class YoutubeDL:
             return ydl.prepare_filename(info).replace(".webm", ".wav")
 
 
-# Function to search a single track
 def search_track(row):
     ydl = YoutubeDL()
-    track_name = row["name"]
-    artists_name = row["artists_name"]
+    track_name = row.name
+    artists_name = row.artists_name
     query = f"{track_name} {artists_name}"
-    return ydl.search_youtube(query)
+    try:
+        url = ydl.search_youtube(query)
+    except Exception as e:
+        url = None
+    return url
 
 
-# Function to download a single track
 def download_url(url):
     ydl = YoutubeDL()
-    return ydl.download_single(url)
+    if url:
+        return ydl.download_single(url)
+    else:
+        print("No URL found for this track.")
+        return None
 
 
 if __name__ == "__main__":
     start_time = time.time()
-    dataset_path = "../datasets/playlist_tracks.csv"
+    dataset_path = "../datasets/major_playlist_tracks.csv"
+    chunk_size = 500
+    output_path = f"{dataset_path}"
+
     df = pd.read_csv(dataset_path)
+    print(f"Loaded dataset with shape: {df.shape}")
 
-    with ProcessPoolExecutor() as executor:
-        urls = list(executor.map(search_track, [row for _, row in df.iterrows()]))
+    final_df_chunks = []
+    for i in tqdm(range(0, len(df), chunk_size), desc="Processing chunks"):
+        j = min(i + chunk_size, len(df))
+        print(f"Processing rows {i} to {j}...")
 
-    df["youtube_url"] = urls
+        df_subset = df.iloc[i:j].copy()
+        with ThreadPoolExecutor() as executor:
+            urls = list(executor.map(search_track, df_subset.itertuples(index=False)))
+            df_subset["youtube_url"] = urls
+            output_paths = list(executor.map(download_url, urls))
+            df_subset["output_path"] = output_paths
+        final_df_chunks.append(df_subset)
 
-    with ProcessPoolExecutor() as executor:
-        output_paths = list(executor.map(download_url, urls))
-
-    df["output_path"] = output_paths
-    df.to_csv(dataset_path, index=False)
-    end_time = time.time()
-    print(
-        f"Downloaded {len(output_paths)} tracks in {end_time - start_time:.2f} seconds."
-    )
+    final_df = pd.concat(final_df_chunks, ignore_index=True)
+    final_df.to_csv(output_path, index=False)
+    total_time = time.time() - start_time
+    print(f"Processed in {total_time:.2f} seconds.")
+    print(f"Saved processed dataset to {output_path}")
